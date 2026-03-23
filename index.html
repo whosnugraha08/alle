@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>alle</title>
-<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@200;300;400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@200;300&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
   html,body{width:100%;height:100%;overflow:hidden;background:#0c0c0c;}
@@ -12,16 +12,24 @@
   #hint{
     position:fixed;bottom:40px;left:50%;transform:translateX(-50%);
     font-family:'Raleway',sans-serif;font-weight:200;font-size:11px;
-    letter-spacing:0.55em;color:rgba(255,255,255,0.28);text-transform:lowercase;
+    letter-spacing:0.55em;color:rgba(255,255,255,0.25);text-transform:lowercase;
     z-index:20;cursor:pointer;animation:blink 2.2s ease-in-out infinite;
   }
-  @keyframes blink{0%,100%{opacity:.18;}55%{opacity:.75;}}
+  @keyframes blink{0%,100%{opacity:.15;}55%{opacity:.7;}}
   #label{
     position:fixed;left:50%;z-index:15;pointer-events:none;
     font-family:'Raleway',sans-serif;font-weight:200;
     font-size:clamp(9px,.8vw,11px);letter-spacing:.65em;
     color:rgba(235,232,228,.18);white-space:nowrap;
-    opacity:0;transition:opacity 4s ease;text-transform:lowercase;
+    opacity:0;transition:opacity 5s ease;text-transform:lowercase;
+  }
+  #caption{
+    position:fixed;left:50%;bottom:72px;transform:translateX(-50%);
+    z-index:15;pointer-events:none;
+    font-family:'Raleway',sans-serif;font-weight:200;
+    font-size:clamp(8px,.72vw,10px);letter-spacing:.5em;
+    color:rgba(235,232,228,0);white-space:nowrap;
+    transition:color 2.5s ease;text-transform:lowercase;
   }
 </style>
 </head>
@@ -29,13 +37,15 @@
 <canvas id="c"></canvas>
 <div id="hint">tap to begin</div>
 <div id="label">formerly known as luxhiro</div>
+<div id="caption"></div>
 
 <script>
-// ════════════════════ CANVAS ════════════════════
+// ═══════════════════ CANVAS ═══════════════════
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 const hint=document.getElementById('hint');
 const label=document.getElementById('label');
+const caption=document.getElementById('caption');
 let W,H;
 let shakeX=0,shakeY=0,shakeMag=0;
 
@@ -48,96 +58,59 @@ function resize(){
 }
 resize();window.addEventListener('resize',resize);
 
-// ════════════════════ COLORS ════════════════════
-// luxhiro = playful palette per letter
-const LCOLORS=[
-  '#FF6B8A', // l - coral pink
-  '#FFB347', // u - warm orange
-  '#FFE566', // x - sunny yellow
-  '#7DD87D', // h - mint green
-  '#6EC6F5', // i - sky blue
-  '#B388FF', // r - lavender
-  '#FF8FAB', // o - rose
-];
-const ALLE_COLOR='#f0ede6'; // clean cream white
+// ═══════════════════ COLORS ═══════════════════
+const LCOLORS=['#FF6B8A','#FFB347','#FFE566','#7DD87D','#6EC6F5','#B388FF','#FF8FAB'];
+const ALLE_COLOR='#f0ede6';
 
-// Global color desaturation factor (0=full color, 1=grey)
-let colorDrain=0;
+let colorDrain=0,colorDrainTarget=0;
 
 function drainColor(hex,t){
-  if(t>=1) return ALLE_COLOR;
-  if(t<=0) return hex;
-  // Parse hex
-  const r=parseInt(hex.slice(1,3),16);
-  const g=parseInt(hex.slice(3,5),16);
-  const b=parseInt(hex.slice(5,7),16);
+  if(t>=1)return ALLE_COLOR;
+  if(t<=0)return hex;
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
   const grey=0.299*r+0.587*g+0.114*b;
-  const tr=r+(grey-r)*t, tg=g+(grey-g)*t, tb=b+(grey-b)*t;
-  // Then shift toward alle cream
+  const tr=r+(grey-r)*t,tg=g+(grey-g)*t,tb=b+(grey-b)*t;
   const cr=240,cg=237,cb=230;
-  const fr=tr+(cr-tr)*t*.6, fg=tg+(cg-tg)*t*.6, fb=tb+(cb-tb)*t*.6;
-  return`rgb(${Math.round(fr)},${Math.round(fg)},${Math.round(fb)})`;
+  return`rgb(${Math.round(tr+(cr-tr)*t*.5)},${Math.round(tg+(cg-tg)*t*.5)},${Math.round(tb+(cb-tb)*t*.5)})`;
 }
 
-// ════════════════════ AUDIO ════════════════════
+// ═══════════════════ AUDIO ═══════════════════
 let ac;
 function A(){if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();return ac;}
 
-// Playful lo-fi pluck
-function playPluck(freq,vol=0.18,delay=0){
-  const a=A();
-  setTimeout(()=>{
-    const t=a.currentTime;
-    const o=a.createOscillator(),g=a.createGain();
-    o.type='triangle';o.frequency.value=freq;
-    // Slight pitch drop — lo-fi feel
-    o.frequency.setValueAtTime(freq*1.05,t);
-    o.frequency.exponentialRampToValueAtTime(freq*.97,t+0.08);
-    g.gain.setValueAtTime(0,t);
-    g.gain.linearRampToValueAtTime(vol,t+0.01);
-    g.gain.exponentialRampToValueAtTime(0.001,t+0.55);
-    // Warm lowpass
+function playPluck(freq,vol=.16,delay=0){
+  const a=A();setTimeout(()=>{
+    const t=a.currentTime,o=a.createOscillator(),g=a.createGain();
+    o.type='triangle';o.frequency.setValueAtTime(freq*1.05,t);o.frequency.exponentialRampToValueAtTime(freq*.97,t+.08);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+.6);
     const flt=a.createBiquadFilter();flt.type='lowpass';flt.frequency.value=900;
-    o.connect(flt);flt.connect(g);g.connect(a.destination);
-    o.start(t);o.stop(t+0.6);
+    o.connect(flt);flt.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.65);
   },delay);
 }
+function playEntryChord(){[[261,0],[329,55],[392,110],[523,165],[659,240]].forEach(([f,d])=>playPluck(f,.13,d));}
 
-// Happy chord on entry
-function playEntryChord(){
-  // Cheerful pentatonic-ish spread
-  [[261,0],[329,55],[392,110],[523,165],[659,240]].forEach(([f,d])=>playPluck(f,.14,d));
-}
-
-// Nervous ticks — accelerating
 let tickTO=null;
 function startTicks(){
   let spd=300;
   function tick(){
-    const a=A();const t=a.currentTime;
-    const o=a.createOscillator(),g=a.createGain();
+    const a=A(),t=a.currentTime,o=a.createOscillator(),g=a.createGain();
     o.type='square';o.frequency.value=1100+Math.random()*500;
-    g.gain.setValueAtTime(.035,t);g.gain.exponentialRampToValueAtTime(.001,t+.04);
+    g.gain.setValueAtTime(.03,t);g.gain.exponentialRampToValueAtTime(.001,t+.04);
     o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.05);
-    spd=Math.max(55,spd*.91);
-    tickTO=setTimeout(tick,spd);
-  }
-  tick();
+    spd=Math.max(50,spd*.91);tickTO=setTimeout(tick,spd);
+  }tick();
 }
 function stopTicks(){clearTimeout(tickTO);}
 
-// Rumble (growing)
 let rumbleSrc=null,rumbleGain=null;
 function startRumble(){
-  const a=A();
-  rumbleGain=a.createGain();rumbleGain.gain.value=0;
+  const a=A();rumbleGain=a.createGain();rumbleGain.gain.value=0;
   const buf=a.createBuffer(2,a.sampleRate*2,a.sampleRate);
   for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*.5;}
   const src=a.createBufferSource();src.buffer=buf;src.loop=true;
   const flt=a.createBiquadFilter();flt.type='lowpass';flt.frequency.value=90;
   src.connect(flt);flt.connect(rumbleGain);rumbleGain.connect(a.destination);
-  src.start();rumbleSrc=src;
-  rumbleGain.gain.linearRampToValueAtTime(.2,a.currentTime+3.5);
+  src.start();rumbleSrc=src;rumbleGain.gain.linearRampToValueAtTime(.2,a.currentTime+3.5);
 }
 function stopRumble(){
   if(!rumbleGain)return;
@@ -145,41 +118,28 @@ function stopRumble(){
   setTimeout(()=>{try{rumbleSrc.stop();}catch(e){}},400);
 }
 
-// Glitch zap
 function playZap(v=.1){
   const a=A(),t=a.currentTime;
   const buf=a.createBuffer(1,a.sampleRate*.07,a.sampleRate);
-  const d=buf.getChannelData(0);
-  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,.4);
+  const d=buf.getChannelData(0);for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,.4);
   const src=a.createBufferSource();src.buffer=buf;
   const flt=a.createBiquadFilter();flt.type='bandpass';flt.frequency.value=2800+Math.random()*2000;flt.Q.value=3;
   const g=a.createGain();g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+.07);
   src.connect(flt);flt.connect(g);g.connect(a.destination);src.start();
 }
-
-// Scream — panic
 function playScream(){
-  const a=A(),t=a.currentTime;
-  const o=a.createOscillator(),g=a.createGain();
-  o.type='sawtooth';
-  o.frequency.setValueAtTime(200,t);
-  o.frequency.linearRampToValueAtTime(800,t+.22);
-  o.frequency.linearRampToValueAtTime(100,t+.5);
-  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.2,t+.05);
-  g.gain.exponentialRampToValueAtTime(.001,t+.55);
+  const a=A(),t=a.currentTime,o=a.createOscillator(),g=a.createGain();
+  o.type='sawtooth';o.frequency.setValueAtTime(200,t);o.frequency.linearRampToValueAtTime(800,t+.22);o.frequency.linearRampToValueAtTime(100,t+.5);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.2,t+.05);g.gain.exponentialRampToValueAtTime(.001,t+.55);
   const flt=a.createBiquadFilter();flt.type='bandpass';flt.frequency.value=500;flt.Q.value=2;
   o.connect(flt);flt.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.6);
 }
-
-// BOOM
 function playBoom(){
   const a=A(),t=a.currentTime;
-  // Sub
   const o=a.createOscillator(),g=a.createGain();
   o.type='sine';o.frequency.setValueAtTime(85,t);o.frequency.exponentialRampToValueAtTime(22,t+.7);
   g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.75,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+.72);
   o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.75);
-  // Noise
   const buf=a.createBuffer(1,a.sampleRate*.5,a.sampleRate);
   const dd=buf.getChannelData(0);for(let i=0;i<dd.length;i++) dd[i]=(Math.random()*2-1)*Math.pow(1-i/dd.length,1.1);
   const ns=a.createBufferSource();ns.buffer=buf;
@@ -187,8 +147,6 @@ function playBoom(){
   const ng=a.createGain();ng.gain.setValueAtTime(.5,t);ng.gain.exponentialRampToValueAtTime(.001,t+.44);
   ns.connect(flt);flt.connect(ng);ng.connect(a.destination);ns.start(t);
 }
-
-// Whoosh
 function playWhoosh(p=1,v=.2,dur=.65){
   const a=A(),t=a.currentTime;
   const buf=a.createBuffer(1,a.sampleRate*dur,a.sampleRate);
@@ -199,111 +157,140 @@ function playWhoosh(p=1,v=.2,dur=.65){
   const g=a.createGain();g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+dur*.85);
   src.connect(flt);flt.connect(g);g.connect(a.destination);src.start(t);
 }
-
-// Boing
 function playBoing(p=1){
-  const a=A(),t=a.currentTime;
-  const o=a.createOscillator(),g=a.createGain();
+  const a=A(),t=a.currentTime,o=a.createOscillator(),g=a.createGain();
   o.type='sine';o.frequency.setValueAtTime(260*p,t);o.frequency.exponentialRampToValueAtTime(70*p,t+.2);
   g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.22);
   o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.25);
 }
 
-// Hum
-let humOsc=null,humG=null;
-function startHum(){
+// Lonely drift tone — after explosion, lost
+function playLonelyDrone(){
   const a=A(),t=a.currentTime;
-  humG=a.createGain();humG.gain.value=0;
-  humOsc=a.createOscillator();humOsc.type='sawtooth';
-  humOsc.frequency.setValueAtTime(48,t);humOsc.frequency.linearRampToValueAtTime(96,t+2);
-  const flt=a.createBiquadFilter();flt.type='lowpass';flt.frequency.value=200;
-  humOsc.connect(flt);flt.connect(humG);humG.connect(a.destination);
-  humOsc.start();humG.gain.linearRampToValueAtTime(.1,t+.5);
-}
-function stopHum(){
-  if(!humG)return;
-  humG.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.5);
-  setTimeout(()=>{try{humOsc.stop();}catch(e){}},600);
-}
-
-// Click per letter lock
-function playClick(i){
-  const a=A(),t=a.currentTime;
-  const freqs=[440,528,594,660];
   const o=a.createOscillator(),g=a.createGain();
-  o.type='square';o.frequency.value=freqs[i%4]*2;
-  g.gain.setValueAtTime(.08,t);g.gain.exponentialRampToValueAtTime(.001,t+.1);
-  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.12);
+  o.type='sine';o.frequency.setValueAtTime(110,t);
+  o.frequency.linearRampToValueAtTime(108,t+4);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.07,t+1.2);
+  g.gain.linearRampToValueAtTime(.04,t+3.5);g.gain.exponentialRampToValueAtTime(.001,t+5);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+5.5);
+  // Distant high tone — loneliness
+  const o2=a.createOscillator(),g2=a.createGain();
+  o2.type='sine';o2.frequency.value=660;
+  g2.gain.setValueAtTime(0,t+.5);g2.gain.linearRampToValueAtTime(.035,t+1.5);
+  g2.gain.exponentialRampToValueAtTime(.001,t+4.5);
+  o2.connect(g2);g2.connect(a.destination);o2.start(t+.5);o2.stop(t+5);
 }
 
-// Alle reveal — clean, mature, minimal
-function playAlleReveal(){
+// Hesitation blip — trying but pulling back
+function playHesitateBlip(pitch=1){
   const a=A(),t=a.currentTime;
-  // Clean sine chord — less busy, more elegant
-  [[196,0],[246,0.09],[294,0.18],[392,0.27]].forEach(([f,d])=>{
+  const o=a.createOscillator(),g=a.createGain();
+  o.type='sine';o.frequency.setValueAtTime(220*pitch,t);
+  o.frequency.linearRampToValueAtTime(180*pitch,t+.15);
+  g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.18);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.2);
+}
+
+// First attempt — a note that rises then stumbles
+function playFirstAttempt(){
+  const a=A(),t=a.currentTime;
+  const o=a.createOscillator(),g=a.createGain();
+  o.type='triangle';
+  o.frequency.setValueAtTime(196,t);
+  o.frequency.linearRampToValueAtTime(294,t+.4);  // rises
+  o.frequency.linearRampToValueAtTime(174,t+.65); // stumbles
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.1,t+.05);
+  g.gain.linearRampToValueAtTime(.05,t+.5);g.gain.exponentialRampToValueAtTime(.001,t+.8);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.85);
+}
+
+// Slow rise — building resolve
+function playRising(delay=0){
+  const a=A();setTimeout(()=>{
+    const t=a.currentTime;
+    [[164,0],[196,.3],[246,.65],[294,1.05]].forEach(([f,d])=>{
+      const o=a.createOscillator(),g=a.createGain();
+      o.type='triangle';o.frequency.value=f;
+      const ct=t+d;
+      g.gain.setValueAtTime(0,ct);g.gain.linearRampToValueAtTime(.08,ct+.08);
+      g.gain.exponentialRampToValueAtTime(.001,ct+1.8);
+      o.connect(g);g.connect(a.destination);o.start(ct);o.stop(ct+2);
+    });
+  },delay);
+}
+
+// Alle finally forms — earned, warm, not triumphant but peaceful
+function playAlleSettle(){
+  const a=A(),t=a.currentTime;
+  // Warm pad chord — resolve, not celebration
+  [[196,0,.09],[246,.12,.08],[294,.24,.07],[392,.38,.06]].forEach(([f,d,v])=>{
     const o=a.createOscillator(),g=a.createGain();
     o.type='sine';o.frequency.value=f;
     const ct=t+d;
-    g.gain.setValueAtTime(0,ct);g.gain.linearRampToValueAtTime(.1,ct+.04);
-    g.gain.exponentialRampToValueAtTime(.001,ct+2.8);
-    o.connect(g);g.connect(a.destination);o.start(ct);o.stop(ct+3);
+    g.gain.setValueAtTime(0,ct);g.gain.linearRampToValueAtTime(v,ct+.15);
+    g.gain.linearRampToValueAtTime(v*.7,ct+1.5);g.gain.exponentialRampToValueAtTime(.001,ct+3.5);
+    const flt=a.createBiquadFilter();flt.type='lowpass';flt.frequency.value=1200;
+    o.connect(flt);flt.connect(g);g.connect(a.destination);o.start(ct);o.stop(ct+4);
   });
-  // Soft high shimmer
-  for(let i=0;i<5;i++){
-    setTimeout(()=>{
-      const o=a.createOscillator(),g=a.createGain();
-      o.type='sine';o.frequency.value=1600+Math.random()*1200;
-      g.gain.setValueAtTime(.055,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.9);
-      o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+1);
-    },i*95);
-  }
-  // Soft thud
-  const o2=a.createOscillator(),g2=a.createGain();
-  o2.type='sine';o2.frequency.setValueAtTime(90,t);o2.frequency.exponentialRampToValueAtTime(35,t+.2);
-  g2.gain.setValueAtTime(.22,t);g2.gain.exponentialRampToValueAtTime(.001,t+.22);
-  o2.connect(g2);g2.connect(a.destination);o2.start(t);o2.stop(t+.25);
+  // Soft breath — like exhaling
+  const buf=a.createBuffer(2,a.sampleRate*1.5,a.sampleRate);
+  for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch);for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2)*.3;}
+  const ns=a.createBufferSource();ns.buffer=buf;
+  const flt=a.createBiquadFilter();flt.type='lowpass';flt.frequency.value=400;
+  const ng=a.createGain();ng.gain.setValueAtTime(0,t);ng.gain.linearRampToValueAtTime(.06,t+.3);ng.gain.exponentialRampToValueAtTime(.001,t+1.4);
+  ns.connect(flt);flt.connect(ng);ng.connect(a.destination);ns.start(t);
+  // Single soft high shimmer — not sparkly, just one breath of light
+  setTimeout(()=>{
+    const o=a.createOscillator(),g=a.createGain();
+    o.type='sine';o.frequency.value=1046;
+    g.gain.setValueAtTime(0,a.currentTime);g.gain.linearRampToValueAtTime(.06,a.currentTime+.2);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+2.2);
+    o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+2.5);
+  },600);
 }
 
-// ════════════════════ SPARKS ════════════════════
+function playLetterLand(i){
+  const a=A(),t=a.currentTime;
+  const freqs=[220,261,294,349];
+  const o=a.createOscillator(),g=a.createGain();
+  o.type='sine';o.frequency.setValueAtTime(freqs[i%4]*1.5,t);o.frequency.exponentialRampToValueAtTime(freqs[i%4],t+.1);
+  g.gain.setValueAtTime(.07,t);g.gain.exponentialRampToValueAtTime(.001,t+.18);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.2);
+}
+
+// ═══════════════════ SPARKS ═══════════════════
 const sparks=[];
 function emitSparks(x,y,n,col){
   for(let i=0;i<n;i++){
-    const ang=Math.random()*Math.PI*2;
-    const spd=.8+Math.random()*5.5;
-    sparks.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd-1.2,
-      life:1,decay:.022+Math.random()*.04,sz:.6+Math.random()*2.2,
-      col:col||'#ffffff'});
+    const ang=Math.random()*Math.PI*2,spd=.8+Math.random()*5.5;
+    sparks.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd-1.2,life:1,decay:.022+Math.random()*.04,sz:.6+Math.random()*2.2,col:col||'#fff'});
   }
 }
 function drawSparks(){
   for(let i=sparks.length-1;i>=0;i--){
     const s=sparks[i];
-    s.x+=s.vx;s.y+=s.vy;s.vy+=.12;s.vx*=.97;s.vy*=.97;
-    s.life-=s.decay;
+    s.x+=s.vx;s.y+=s.vy;s.vy+=.12;s.vx*=.97;s.vy*=.97;s.life-=s.decay;
     if(s.life<=0){sparks.splice(i,1);continue;}
-    ctx.globalAlpha=s.life*s.life;
-    ctx.fillStyle=s.col;
+    ctx.globalAlpha=s.life*s.life;ctx.fillStyle=s.col;
     ctx.beginPath();ctx.arc(s.x+shakeX,s.y+shakeY,s.sz*s.life,0,Math.PI*2);ctx.fill();
-  }
-  ctx.globalAlpha=1;
+  }ctx.globalAlpha=1;
 }
 
-// ════════════════════ SHAKE ════════════════════
+// ═══════════════════ SHAKE ═══════════════════
 function shake(m){shakeMag=Math.max(shakeMag,m);}
 function updateShake(){
   if(shakeMag>.3){shakeX=(Math.random()-.5)*shakeMag*2;shakeY=(Math.random()-.5)*shakeMag*2;shakeMag*=.8;}
   else{shakeX=0;shakeY=0;shakeMag=0;}
 }
 
-// ════════════════════ LETTER ════════════════════
+// ═══════════════════ LETTER ═══════════════════
 class Letter{
   constructor(char,x,y,fs,col){
     this.char=char;this.ox=x;this.oy=y;
     this.x=x;this.y=y;this.tx=x;this.ty=y;
     this.vx=0;this.vy=0;this.angle=0;this.va=0;
     this.alpha=0;this.fs=fs;
-    this.col=col;         // source color
-    this.drawCol=col;     // current drawn color
+    this.col=col;this.drawCol=col;
     this.mode='idle';
     this.phi=Math.random()*Math.PI*2;
     this.glitch=0;this.nervousness=0;
@@ -312,21 +299,29 @@ class Letter{
     this.locked=false;
     this.orbitAngle=0;this.orbitR=0;this.orbitSpd=0;
     this.nOff=(Math.random()-.5)*.4;
-    // Playful bounce on entry
     this.bouncePhase=Math.random()*Math.PI*2;
-    this.bouncing=true;
+    // For hesitate phase
+    this.hesitateTimer=0;
+    this.hesitateMax=0;
+    this.pullStrength=0;
+    this.hasPulled=false;
+    // For rise phase — individual delay before starting to move home
+    this.riseDelay=0;
+    this.riseStarted=false;
+    // Droop: letter sags down before pulling itself up
+    this.droop=0; // extra Y offset, positive = drooped down
+    this.droopPhase='none'; // none | falling | recovering
+    this.droopTimer=0;
   }
 
-  draw(t,drain){
+  draw(drain){
     this.drawCol=drainColor(this.col,drain);
 
-    // Trail
-    if(this.mode==='fly'||this.mode==='orbit'){
+    if(this.mode==='fly'||this.mode==='orbit'||this.mode==='drift'){
       for(let i=0;i<this.trail.length;i++){
-        const tr=this.trail[i];const f=i/this.trail.length;
+        const tr=this.trail[i],f=i/this.trail.length;
         ctx.save();ctx.translate(tr.x+shakeX,tr.y+shakeY);
-        ctx.globalAlpha=f*.18*this.alpha;
-        ctx.fillStyle=this.drawCol;
+        ctx.globalAlpha=f*.15*this.alpha;ctx.fillStyle=this.drawCol;
         ctx.font=`200 ${this.fs*.88}px 'Raleway',sans-serif`;
         ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText(this.char,0,0);ctx.restore();
@@ -336,114 +331,148 @@ class Letter{
     ctx.save();
     let nx=0,ny=0;
     if(this.nervousness>0){nx=(Math.random()-.5)*this.nervousness;ny=(Math.random()-.5)*this.nervousness;}
-    ctx.translate(this.x+shakeX+nx,this.y+shakeY+ny);
-    ctx.rotate(this.angle);
-    ctx.scale(this.squishX,this.squishY);
+    ctx.translate(this.x+shakeX+nx,this.y+shakeY+ny+this.droop);
+    ctx.rotate(this.angle);ctx.scale(this.squishX,this.squishY);
 
-    // Glitch ghosts
     if(this.glitch>.08){
-      ctx.save();
-      ctx.globalAlpha=this.alpha*this.glitch*.5;
-      ctx.fillStyle=this.drawCol;
-      ctx.font=`200 ${this.fs}px 'Raleway',sans-serif`;
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(this.char,(Math.random()-.5)*this.glitch*16,(Math.random()-.5)*this.glitch*7);
-      ctx.restore();
+      ctx.save();ctx.globalAlpha=this.alpha*this.glitch*.5;ctx.fillStyle=this.drawCol;
+      ctx.font=`200 ${this.fs}px 'Raleway',sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(this.char,(Math.random()-.5)*this.glitch*16,(Math.random()-.5)*this.glitch*7);ctx.restore();
     }
 
-    // Glow — colorful when luxhiro, subtle when alle
-    const glowColor=drain>.7?'rgba(210,206,196,.45)':this.drawCol+'88';
-    ctx.shadowColor=glowColor;
-    ctx.shadowBlur=drain>.7?14:20;
-    ctx.globalAlpha=Math.max(0,Math.min(1,this.alpha));
-    ctx.fillStyle=this.drawCol;
+    const glowCol=drain>.7?'rgba(210,206,196,.4)':this.drawCol+'88';
+    ctx.shadowColor=glowCol;ctx.shadowBlur=drain>.7?10:18;
+    ctx.globalAlpha=Math.max(0,Math.min(1,this.alpha));ctx.fillStyle=this.drawCol;
     ctx.font=`200 ${this.fs}px 'Raleway',sans-serif`;
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(this.char,0,0);
-    ctx.shadowBlur=0;ctx.restore();
+    ctx.fillText(this.char,0,0);ctx.shadowBlur=0;ctx.restore();
   }
 
-  update(dt,t,nervousness,glitch){
-    this.squishX+=(1-this.squishX)*.16;
-    this.squishY+=(1-this.squishY)*.16;
-    this.glitch=glitch*(0.5+.8*Math.abs(Math.sin(t*3.5+this.phi)));
+  update(dt,t,nervousness,glitch,phaseInfo){
+    this.squishX+=(1-this.squishX)*.16;this.squishY+=(1-this.squishY)*.16;
+    this.glitch=glitch*(.5+.8*Math.abs(Math.sin(t*3.5+this.phi)));
     this.nervousness=nervousness*(.7+.6*Math.abs(Math.sin(t*2+this.phi+this.nOff)));
 
     if(this.mode==='idle'){
       this.alpha=Math.min(this.alpha+dt*1.4,.95);
-      if(this.bouncing){
-        // Playful bounce settle
-        this.y=this.oy+Math.sin(t*3.5+this.bouncePhase)*4*Math.max(0,1-t*.3);
-      }
+      this.y=this.oy+Math.sin(t*3.5+this.bouncePhase)*4*Math.max(0,1-t*.3);
 
     } else if(this.mode==='fly'){
-      this.trail.push({x:this.x,y:this.y});
-      if(this.trail.length>10)this.trail.shift();
+      this.trail.push({x:this.x,y:this.y});if(this.trail.length>10)this.trail.shift();
       this.vy+=.43;this.vx*=.991;this.vy*=.991;
-      this.x+=this.vx;this.y+=this.vy;
-      this.angle+=this.va;this.va*=.997;
+      this.x+=this.vx;this.y+=this.vy;this.angle+=this.va;this.va*=.997;
       const pad=this.fs*.5;
-      if(this.x<pad){
-        this.x=pad;this.vx=Math.abs(this.vx)*(.5+Math.random()*.3);
-        this.va=(Math.random()-.5)*.5;this.squishX=.55;this.squishY=1.45;
-        emitSparks(this.x,this.y,8,this.drawCol);playBoing(.7+Math.random()*.7);
-      }
-      if(this.x>W-pad){
-        this.x=W-pad;this.vx=-Math.abs(this.vx)*(.5+Math.random()*.3);
-        this.va=(Math.random()-.5)*.5;this.squishX=.55;this.squishY=1.45;
-        emitSparks(this.x,this.y,8,this.drawCol);playBoing(.7+Math.random()*.7);
-      }
+      if(this.x<pad){this.x=pad;this.vx=Math.abs(this.vx)*(.5+Math.random()*.3);this.va=(Math.random()-.5)*.5;this.squishX=.55;this.squishY=1.45;emitSparks(this.x,this.y,8,this.drawCol);playBoing(.7+Math.random()*.7);}
+      if(this.x>W-pad){this.x=W-pad;this.vx=-Math.abs(this.vx)*(.5+Math.random()*.3);this.va=(Math.random()-.5)*.5;this.squishX=.55;this.squishY=1.45;emitSparks(this.x,this.y,8,this.drawCol);playBoing(.7+Math.random()*.7);}
       if(this.y>H+pad*3){this.y=-pad;this.vy*=-.4;}
       if(this.y<-pad*5){this.vy=Math.abs(this.vy)*.5;}
 
-    } else if(this.mode==='orbit'){
-      this.trail.push({x:this.x,y:this.y});
-      if(this.trail.length>8)this.trail.shift();
-      this.orbitAngle+=this.orbitSpd;this.orbitR*=.972;
-      this.x=W/2+Math.cos(this.orbitAngle)*this.orbitR;
-      this.y=H/2+Math.sin(this.orbitAngle)*this.orbitR;
-      this.angle+=.05;
+    } else if(this.mode==='drift'){
+      // Aimless slow drift — lost, exhausted
+      this.trail.push({x:this.x,y:this.y});if(this.trail.length>6)this.trail.shift();
+      this.vx*=.97;this.vy*=.97;
+      // Gentle gravity pull toward center — gravity of emptiness
+      this.vx+=(W/2-this.x)*.0005;this.vy+=(H/2-this.y)*.0005;
+      this.x+=this.vx;this.y+=this.vy;
+      this.angle+=this.va*.2;
+      this.alpha=Math.max(.35,this.alpha-dt*.08);
 
-    } else if(this.mode==='home'){
-      this.trail=[];
+    } else if(this.mode==='hesitate'){
+      // Letter moves toward target a bit then pulls back — scared, unsure
+      this.hesitateTimer+=dt;
       const dx=this.tx-this.x,dy=this.ty-this.y;
       const dist=Math.sqrt(dx*dx+dy*dy);
-      this.vx+=dx*.11;this.vy+=dy*.11;this.vx*=.77;this.vy*=.77;
+
+      // Only pull a little bit, then resist
+      const pullFrac=Math.sin(this.hesitateTimer*1.5)*0.5+0.5; // 0-1 oscillate
+      const k=.015*pullFrac*this.pullStrength;
+      this.vx+=dx*k;this.vy+=dy*k;
+      // Strong drag — moves sluggishly
+      this.vx*=.88;this.vy*=.88;
       this.x+=this.vx;this.y+=this.vy;
-      this.angle+=(0-this.angle)*.13;
-      this.alpha=Math.min(1,this.alpha+dt*2.5);
+      this.angle+=(0-this.angle)*.05;
+      this.alpha=Math.max(.4,Math.min(.8,this.alpha));
+
+      if(this.hesitateTimer>this.hesitateMax&&!this.hasPulled){
+        this.hasPulled=true;
+      }
+
+    } else if(this.mode==='droop'){
+      // Letter tries to rise but sags down first — acknowledging failure
+      this.droopTimer+=dt;
+      if(this.droopPhase==='falling'){
+        // Sag downward
+        this.droop=Math.sin(Math.min(this.droopTimer/0.6,1)*Math.PI*.5)*28;
+        if(this.droopTimer>.55){this.droopPhase='recovering';this.droopTimer=0;}
+      } else if(this.droopPhase==='recovering'){
+        // Slowly pull up
+        const p=Math.min(this.droopTimer/1.2,1);
+        this.droop=28*(1-p*p);
+        if(this.droopTimer>1.1){
+          this.droop=0;this.mode='home';
+        }
+      }
+      // Gentle pull toward target even while drooping
+      const dx=this.tx-this.x,dy=this.ty-this.y;
+      this.vx+=dx*.04;this.vy+=dy*.04;this.vx*=.82;this.vy*=.82;
+      this.x+=this.vx;this.y+=this.vy;
+      this.alpha=Math.min(1,this.alpha+dt*1.2);
+
+    } else if(this.mode==='home'){
+      this.trail=[];this.droop=0;
+      const dx=this.tx-this.x,dy=this.ty-this.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      // Elastic spring
+      const k=.10+.05*Math.min(1,stageT/2);
+      this.vx+=dx*k;this.vy+=dy*k;this.vx*=.78;this.vy*=.78;
+      this.x+=this.vx;this.y+=this.vy;
+      this.angle+=(0-this.angle)*.14;
+      this.alpha=Math.min(1,this.alpha+dt*2);
       if(dist<1.5&&!this.locked){
         this.locked=true;this.mode='locked';this.x=this.tx;this.y=this.ty;
-        this.squishX=1.35;this.squishY=.68;
-        emitSparks(this.x,this.y,14,ALLE_COLOR);
+        this.squishX=1.3;this.squishY=.72;
+        emitSparks(this.x,this.y,10,ALLE_COLOR);
         return 'locked';
       }
     } else if(this.mode==='locked'){
+      this.droop=0;
       this.angle+=(0-this.angle)*.18;
-      this.alpha=.96+Math.sin(t*.7+this.phi)*.04;
+      this.alpha=.96+Math.sin(t*.6+this.phi)*.03;
     }
     return null;
   }
 }
 
-// ════════════════════ LAYOUT ════════════════════
+// ═══════════════════ LAYOUT ═══════════════════
 function getPos(word,fs,cx,cy){
-  ctx.font=`200 ${fs}px 'Raleway',sans-serif`;
-  ctx.textAlign='left';ctx.textBaseline='middle';
+  ctx.font=`200 ${fs}px 'Raleway',sans-serif`;ctx.textAlign='left';ctx.textBaseline='middle';
   let cur=cx-ctx.measureText(word).width/2;
   return[...word].map(ch=>{const w=ctx.measureText(ch).width;const p={x:cur+w/2,y:cy};cur+=w;return p;});
 }
 
-// ════════════════════ STATE MACHINE ════════════════════
-const ST={WAITING:0,SHOW:1,NERVOUS:2,GLITCH:3,STRUGGLE:4,BREAK:5,ORBIT:6,GATHER:7,DONE:8};
+// ═══════════════════ CAPTIONS ═══════════════════
+function showCaption(text,dur=2200){
+  caption.textContent=text;
+  caption.style.color='rgba(235,232,228,0.22)';
+  setTimeout(()=>caption.style.color='rgba(235,232,228,0)',dur);
+}
+
+// ═══════════════════ STATE MACHINE ═══════════════════
+/*
+  SHOW → NERVOUS → GLITCH → STRUGGLE → BREAK
+  → DRIFT (lost, aimless)
+  → HESITATE (tries to move, pulls back — fear)
+  → DROOP (sags before rising — accepting the weight)
+  → RISE (slowly climbs home)
+  → LOCKED (alle settles peacefully)
+*/
+const ST={WAITING:0,SHOW:1,NERVOUS:2,GLITCH:3,STRUGGLE:4,BREAK:5,DRIFT:6,HESITATE:7,DROOP:8,RISE:9,DONE:10};
 let letters=[];
-let stage=ST.WAITING;
-let stageT=0;let globalT=0;let lastNow=null;
-let gNervousness=0;let gGlitch=0;
-let colorDrainTarget=0;
-let locksGotten=0;
-let started=false;
+let stage=ST.WAITING,stageT=0,globalT=0,lastNow=null;
+let gNerv=0,gGlitch=0;
+let locksGotten=0,started=false;
 const strPos=[];
+let captionShown={};
 
 const FS=()=>Math.min(W*.115,152);
 
@@ -452,165 +481,171 @@ function buildLuxhiro(){
   const pos=getPos('luxhiro',fs,W/2,H/2);
   letters=pos.map((p,i)=>new Letter('luxhiro'[i],p.x,p.y,fs,LCOLORS[i]));
 }
-
 function setStage(s){stage=s;stageT=0;}
 
 function doStruggle(){
-  setStage(ST.STRUGGLE);playScream();shake(5);
-  colorDrainTarget=0.6; // starts draining color during struggle
-  letters.forEach((l,i)=>{
-    strPos[i]={ox:l.x,oy:l.y};
-    l.vx=(Math.random()-.5)*30;l.vy=(Math.random()-.5)*26-5;
-  });
+  setStage(ST.STRUGGLE);playScream();shake(5);colorDrainTarget=.55;
+  letters.forEach((l,i)=>{strPos[i]={ox:l.x,oy:l.y};l.vx=(Math.random()-.5)*30;l.vy=(Math.random()-.5)*26-5;});
 }
-
 function doBreak(){
-  setStage(ST.BREAK);stopTicks();stopRumble();
-  playBoom();shake(22);
-  colorDrainTarget=0.85;
+  setStage(ST.BREAK);stopTicks();stopRumble();playBoom();shake(22);colorDrainTarget=.82;
+  letters.forEach(l=>{emitSparks(l.x,l.y,10,l.drawCol);});
+  emitSparks(W/2,H/2,18,'#fff');
   letters.forEach((l,i)=>{
-    emitSparks(l.x,l.y,12,l.drawCol); // colorful sparks fly out!
-  });
-  emitSparks(W/2,H/2,20,'#ffffff');
-  letters.forEach((l,i)=>{
-    l.mode='fly';
-    const ang=-Math.PI*.5+(Math.random()-.5)*Math.PI*2.4;
-    const spd=12+Math.random()*23;
+    l.mode='fly';const ang=-Math.PI*.5+(Math.random()-.5)*Math.PI*2.4,spd=12+Math.random()*23;
     l.vx=Math.cos(ang)*spd;l.vy=Math.sin(ang)*spd-4;l.va=(Math.random()-.5)*.58;
     setTimeout(()=>playWhoosh(.7+Math.random()*.8,.13,.4),i*28);
   });
 }
-
-function doOrbit(){
-  setStage(ST.ORBIT);playWhoosh(1.5,.2,1.2);startHum();
-  colorDrainTarget=0.92;
-  letters.forEach((l,i)=>{
-    setTimeout(()=>{
-      l.mode='orbit';
-      const dx=l.x-W/2,dy=l.y-H/2;
-      l.orbitR=Math.sqrt(dx*dx+dy*dy);
-      l.orbitAngle=Math.atan2(dy,dx);
-      l.orbitSpd=(Math.random()<.5?1:-1)*(.035+Math.random()*.04);
-    },i*50);
+function doDrift(){
+  setStage(ST.DRIFT);colorDrainTarget=.9;
+  playLonelyDrone();
+  showCaption('...',3000);
+  letters.forEach(l=>{
+    l.mode='drift';
+    // Each letter drifts aimlessly with slow random velocity
+    l.vx=(Math.random()-.5)*2;l.vy=(Math.random()-.5)*2;l.va=(Math.random()-.5)*.02;
+    l.alpha=.5;
   });
 }
-
-function doGather(){
-  setStage(ST.GATHER);stopHum();playWhoosh(2,.28,.9);shake(8);
-  colorDrainTarget=1; // fully grey→cream as alle forms
-  locksGotten=0;
-  const fs=FS()*1.1;
+function doHesitate(){
+  setStage(ST.HESITATE);
+  showCaption('',100);
+  const fs=FS()*1.08;
   const pos=getPos('alle',fs,W/2,H/2);
+  // First 4 letters get targets but hesitate to go
   'alle'.split('').forEach((ch,ai)=>{
     const l=letters[ai];
-    setTimeout(()=>{l.char=ch;l.fs=fs;l.mode='home';l.locked=false;l.tx=pos[ai].x;l.ty=pos[ai].y;},ai*75);
+    l.char=ch;l.fs=fs;l.tx=pos[ai].x;l.ty=pos[ai].y;
+    l.mode='hesitate';l.hesitateTimer=0;
+    l.hesitateMax=1.5+ai*.4; // each letter hesitates for different amount
+    l.pullStrength=.6+Math.random()*.4;l.hasPulled=false;
+    // Trigger hesitate blip sounds
+    setTimeout(()=>playHesitateBlip(.8+ai*.15),400+ai*350);
+    setTimeout(()=>playHesitateBlip(.7+ai*.1),1000+ai*300);
   });
+  // Last 3 letters — already fading
   [4,5,6].forEach((li,idx)=>{
     const l=letters[li];
     setTimeout(()=>{
-      l.mode='fly';l.vy=-20-Math.random()*10;l.vx=(Math.random()-.5)*14;l.va=(Math.random()-.5)*.5;
-      const fd=()=>{l.alpha=Math.max(0,l.alpha-.03);if(l.alpha>0)requestAnimationFrame(fd);};fd();
-      playWhoosh(1.2+idx*.2,.1,.3);
-    },idx*55);
+      l.mode='fly';l.vy=-15-Math.random()*8;l.vx=(Math.random()-.5)*10;l.va=(Math.random()-.5)*.4;
+      const fd=()=>{l.alpha=Math.max(0,l.alpha-.02);if(l.alpha>0)requestAnimationFrame(fd);};
+      setTimeout(fd,200+idx*200);
+    },idx*120);
   });
-  label.style.top='50%';
-  label.style.transform=`translate(-50%,${FS()*1.1*.88}px)`;
+}
+function doDropAndRise(){
+  setStage(ST.DROOP);colorDrainTarget=1;
+  playFirstAttempt();
+  showCaption('',100);
+  // Each alle letter droops then rises — staggered
+  const delays=[0,320,580,820];
+  letters.slice(0,4).forEach((l,i)=>{
+    setTimeout(()=>{
+      l.mode='droop';l.droopPhase='falling';l.droopTimer=0;
+      l.riseDelay=delays[i];l.riseStarted=true;
+    },delays[i]);
+    // Rising SFX per letter
+    setTimeout(()=>playRising(0),delays[i]+600);
+  });
+}
+function doRise(){
+  setStage(ST.RISE);
+  locksGotten=0;
+  letters.slice(0,4).forEach((l,i)=>{
+    if(l.mode!=='locked'){l.mode='home';l.locked=false;}
+  });
 }
 
-// ════════════════════ LOOP ════════════════════
+// ═══════════════════ LOOP ═══════════════════
 function loop(now){
   requestAnimationFrame(loop);
   const dt=lastNow?Math.min((now-lastNow)/1000,.05):0;
   lastNow=now;stageT+=dt;globalT+=dt;
 
-  // Smooth color drain
-  colorDrain+=(colorDrainTarget-colorDrain)*dt*1.2;
-
+  colorDrain+=(colorDrainTarget-colorDrain)*dt*1.1;
   updateShake();
 
-  // BG — tint shifts from very subtly warm to pure black as drain progresses
-  const bgL=Math.round(colorDrain*6); // 0→6
-  const trailA=(stage===ST.BREAK||stage===ST.ORBIT)?.13:1;
-  ctx.fillStyle=`rgba(${12-bgL},${12-bgL},${12-bgL},${trailA})`;
+  const trailA=(stage===ST.BREAK||stage===ST.DRIFT)?.12:1;
+  ctx.fillStyle=`rgba(${12},${12},${12},${trailA})`;
   ctx.fillRect(0,0,W,H);
 
-  // ── State transitions ──
+  // ── Transitions ──
   if(stage===ST.SHOW&&stageT>1.8){setStage(ST.NERVOUS);startRumble();startTicks();}
   if(stage===ST.NERVOUS){
-    const p=Math.min(stageT/2.5,1);
-    gNervousness=p*p*14;gGlitch=0;
-    if(stageT>2.5) setStage(ST.GLITCH);
+    const p=Math.min(stageT/2.5,1);gNerv=p*p*14;gGlitch=0;
+    if(stageT>2.5)setStage(ST.GLITCH);
   }
   if(stage===ST.GLITCH){
-    const p=Math.min(stageT/1.8,1);
-    gNervousness=14+p*8;gGlitch=p*p*.9;
-    if(stageT%.22<dt) playZap(.08+p*.1);
-    shake(p*3);
-    if(stageT>1.8) doStruggle();
+    const p=Math.min(stageT/1.8,1);gNerv=14+p*8;gGlitch=p*p*.9;
+    if(stageT%.22<dt)playZap(.08+p*.1);shake(p*3);
+    if(stageT>1.8)doStruggle();
   }
   if(stage===ST.STRUGGLE){
-    const p=Math.min(stageT/1.4,1);
-    gNervousness=22+Math.sin(globalT*12)*5;gGlitch=.8+Math.sin(globalT*8)*.2;
+    gNerv=22+Math.sin(globalT*12)*5;gGlitch=.8+Math.sin(globalT*8)*.2;
     letters.forEach((l,i)=>{
       if(!strPos[i])return;
       const dx=strPos[i].ox-l.x,dy=strPos[i].oy-l.y;
-      l.vx+=dx*.06;l.vy+=dy*.06;l.vx*=.88;l.vy*=.88;l.x+=l.vx;l.y+=l.vy;
-      l.nervousness=22+Math.random()*8;
+      l.vx+=dx*.06;l.vy+=dy*.06;l.vx*=.88;l.vy*=.88;l.x+=l.vx;l.y+=l.vy;l.nervousness=22+Math.random()*8;
     });
-    if(stageT%.12<dt) playZap(.14);shake(4);
-    if(stageT>1.4) doBreak();
+    if(stageT%.12<dt)playZap(.14);shake(4);
+    if(stageT>1.4)doBreak();
   }
-  if(stage===ST.BREAK){gNervousness=0;gGlitch=0;if(stageT>2.8) doOrbit();}
-  if(stage===ST.ORBIT&&stageT>2.0) doGather();
-  if(stage===ST.GATHER&&stageT>4.2&&label.style.opacity!=='1') label.style.opacity='1';
+  if(stage===ST.BREAK){gNerv=0;gGlitch=0;if(stageT>2.5)doDrift();}
+  if(stage===ST.DRIFT){
+    gNerv=0;gGlitch=0;
+    if(stageT>3.8)doHesitate();
+  }
+  if(stage===ST.HESITATE){
+    gNerv=0;gGlitch=0;
+    if(stageT>4.0)doDropAndRise();
+  }
+  if(stage===ST.DROOP){
+    // Check if all droop phases done
+    const droopDone=letters.slice(0,4).every(l=>l.mode==='home'||l.mode==='locked');
+    if(droopDone&&stageT>2.5)doRise();
+    if(stageT>3.5&&stageT<4)doRise(); // safety
+  }
+  if(stage===ST.RISE&&stageT>5&&label.style.opacity!=='1')label.style.opacity='1';
 
-  // ── Update + draw letters ──
+  // ── Update + draw ──
   for(const l of letters){
-    if(stage===ST.STRUGGLE){l.draw(globalT,colorDrain);continue;}
-    const ev=l.update(dt,globalT,gNervousness,gGlitch);
+    if(stage===ST.STRUGGLE){l.draw(colorDrain);continue;}
+    const ev=l.update(dt,globalT,gNerv,gGlitch,{stage,stageT});
     if(ev==='locked'){
-      locksGotten++;playClick(locksGotten-1);
-      if(locksGotten===4){setTimeout(()=>{playAlleReveal();shake(6);},80);setStage(ST.DONE);}
+      locksGotten++;playLetterLand(locksGotten-1);
+      if(locksGotten===4){
+        setTimeout(()=>{playAlleSettle();shake(4);},120);
+        setStage(ST.DONE);label.style.opacity='1';
+      }
     }
-    l.draw(globalT,colorDrain);
+    l.draw(colorDrain);
   }
 
   drawSparks();
 
-  // Idle ghost — colorful even in preview
+  // Idle ghost
   if(stage===ST.WAITING){
-    [...'luxhiro'].forEach((ch,i)=>{
-      ctx.globalAlpha=.08;
-      ctx.fillStyle=LCOLORS[i];ctx.shadowColor=LCOLORS[i];ctx.shadowBlur=12;
-      ctx.font=`200 ${FS()}px 'Raleway',sans-serif`;
-      ctx.textAlign='center';ctx.textBaseline='middle';
-    });
+    [...'luxhiro'].forEach((ch,i)=>{ctx.globalAlpha=.06+Math.sin(globalT+i)*.02;ctx.fillStyle=LCOLORS[i];ctx.shadowColor=LCOLORS[i];ctx.shadowBlur=10;});
     ctx.globalAlpha=.07;ctx.fillStyle='#f0ede6';
-    ctx.font=`200 ${FS()}px 'Raleway',sans-serif`;
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.shadowColor='rgba(200,196,188,.3)';ctx.shadowBlur=16;
-    ctx.fillText('luxhiro',W/2,H/2);
-    ctx.shadowBlur=0;ctx.globalAlpha=1;
+    ctx.font=`200 ${FS()}px 'Raleway',sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(200,196,188,.25)';ctx.shadowBlur=14;ctx.fillText('luxhiro',W/2,H/2);ctx.shadowBlur=0;ctx.globalAlpha=1;
   }
 
   // Vignette
   const vig=ctx.createRadialGradient(W/2,H/2,H*.2,W/2,H/2,H*.9);
-  vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,.78)');
+  vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,.8)');
   ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
 }
 
-// ════════════════════ START ════════════════════
+// ═══════════════════ START ═══════════════════
 function begin(){
-  if(started)return;started=true;
-  A();
+  if(started)return;started=true;A();
   hint.style.transition='opacity .8s';hint.style.opacity='0';
   setTimeout(()=>hint.style.display='none',900);
-  buildLuxhiro();
-  setStage(ST.SHOW);stageT=0;lastNow=null;
-  // Playful entry sounds
+  buildLuxhiro();setStage(ST.SHOW);stageT=0;lastNow=null;
   setTimeout(()=>playEntryChord(),200);
 }
-
 document.addEventListener('click',begin,{once:true});
 document.addEventListener('touchstart',begin,{once:true,passive:true});
 requestAnimationFrame(loop);
